@@ -1,3 +1,4 @@
+using System.Security.Cryptography.X509Certificates;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
@@ -61,11 +62,16 @@ namespace AspireApp1.ApiService.Controllers
             var inputFeatures = new List<float>();
 
             // Add lag features for recent stock prices
-            foreach (var price in request.RecentStockPrices)
-            {
-                inputFeatures.Add((float)price);
-            }
+            // foreach (var price in request.RecentStockPrices)
+            // {
+            //     inputFeatures.Add((float)price);
+            // }
 
+            for (int i = 0; i < 5; i++)
+            {
+                inputFeatures.Add((float)request.RecentStockPrices[i]);
+            }
+            
             // Add moving averages (you may need to compute them here)
             var ma5 = request.RecentStockPrices.TakeLast(5).Average();
             var ma10 = request.RecentStockPrices.Average();
@@ -73,19 +79,26 @@ namespace AspireApp1.ApiService.Controllers
             inputFeatures.Add((float)ma10);
 
             // Add related company prices
-            foreach (var price in request.RelatedCompanyPrices.Values)
-            {
-                inputFeatures.Add((float)price);
-            }
+            // foreach (var price in request.RelatedCompanyPrices.Values)
+            // {
+            //     inputFeatures.Add((float)price);
+            // }
 
-            // Add economic indicators
-            foreach (var indicatorValues in request.EconomicIndicators.Values)
+            for (int i = 0; i < 3; i++)
             {
-                foreach (var value in indicatorValues)
-                {
-                    inputFeatures.Add((float)value);
-                }
+                inputFeatures.Add((float)request.RelatedCompanyPrices.Values.ElementAt(i));
             }
+            
+            // Add economic indicators
+            // foreach (var indicatorValues in request.EconomicIndicators.Values)
+            // {
+            //     foreach (var value in indicatorValues)
+            //     {
+            //         inputFeatures.Add((float)value);
+            //     }
+            // }
+            
+            Console.WriteLine("Size of input features is: " + inputFeatures.ToArray().Length);
 
             // Convert input features to tensor
             var tensor = new DenseTensor<float>(inputFeatures.ToArray(), new[] { 1, inputFeatures.Count });
@@ -95,7 +108,7 @@ namespace AspireApp1.ApiService.Controllers
             {
                 NamedOnnxValue.CreateFromTensor(inputName, tensor)
             };
-
+            Console.WriteLine("Size of input data is: " + inputData.ToArray().Length);
             return inputData;
         }
     }

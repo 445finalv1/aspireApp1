@@ -46,19 +46,19 @@ app.MapPost("/stockprediction", (StockPredictionRequest request) =>
         var inputData = PrepareInputData(request, inputName);
 
         // Run inference
-        //using var results = session.Run(inputData);
+        using var results = session.Run(inputData);
 
         // Extract the prediction
-        //var predictedPrice = results.First().AsEnumerable<float>().First();
+        var predictedPrice = results.First().AsEnumerable<float>().First();
 
         // Return the response
         var response = new StockPredictionResponse
         {
-            //PredictedPrice = (decimal)predictedPrice,
-            PredictedPrice = 324.5m,
+            PredictedPrice = (decimal)predictedPrice,
+            //PredictedPrice = 100.0m,
             Message = "Prediction successful."
         };
-        //Console.WriteLine($"\nPredicted Price: {predictedPrice}");
+        Console.WriteLine($"\nPredicted Price: {predictedPrice}");
         return Results.Ok(response);
     }
     catch (Exception ex)
@@ -74,31 +74,43 @@ app.MapPost("/stockprediction", (StockPredictionRequest request) =>
         var inputFeatures = new List<float>();
 
         // Add lag features for recent stock prices
-        foreach (var price in request.RecentStockPrices)
-        {
-            inputFeatures.Add((float)price);
-        }
+        // foreach (var price in request.RecentStockPrices)
+        // {
+        //     inputFeatures.Add((float)price);
+        // }
 
-        // Add moving averages
+        for (int i = 0; i < 5; i++)
+        {
+            inputFeatures.Add((float)request.RecentStockPrices[i]);
+        }
+            
+        // Add moving averages (you may need to compute them here)
         var ma5 = request.RecentStockPrices.TakeLast(5).Average();
         var ma10 = request.RecentStockPrices.Average();
         inputFeatures.Add((float)ma5);
         inputFeatures.Add((float)ma10);
 
         // Add related company prices
-        foreach (var price in request.RelatedCompanyPrices.Values)
-        {
-            inputFeatures.Add((float)price);
-        }
+        // foreach (var price in request.RelatedCompanyPrices.Values)
+        // {
+        //     inputFeatures.Add((float)price);
+        // }
 
-        // Add economic indicators
-        foreach (var indicatorValues in request.EconomicIndicators.Values)
+        for (int i = 0; i < 3; i++)
         {
-            foreach (var value in indicatorValues)
-            {
-                inputFeatures.Add((float)value);
-            }
+            inputFeatures.Add((float)request.RelatedCompanyPrices.Values.ElementAt(i));
         }
+            
+        // Add economic indicators
+        // foreach (var indicatorValues in request.EconomicIndicators.Values)
+        // {
+        //     foreach (var value in indicatorValues)
+        //     {
+        //         inputFeatures.Add((float)value);
+        //     }
+        // }
+            
+        Console.WriteLine("Size of input features is: " + inputFeatures.ToArray().Length);
 
         // Convert input features to tensor
         var tensor = new DenseTensor<float>(inputFeatures.ToArray(), new[] { 1, inputFeatures.Count });
@@ -108,8 +120,49 @@ app.MapPost("/stockprediction", (StockPredictionRequest request) =>
         {
             NamedOnnxValue.CreateFromTensor(inputName, tensor)
         };
+        Console.WriteLine("Size of input data is: " + inputData.ToArray().Length);
 
         return inputData;
+    }
+});
+
+app.MapGet("/companylist", () =>
+{
+    // Define the relative path to the Models directory
+    var relativePath = Path.Combine("Data", "Models");
+
+    // Get the absolute path based on the current directory
+    var directoryPath = Path.Combine(Directory.GetCurrentDirectory(), relativePath);
+
+    // Check if the directory exists
+    if (!Directory.Exists(directoryPath))
+    {
+        return Results.NotFound(new { message = "Directory not found." });
+    }
+
+    try
+    {
+        // Retrieve all file names in the directory
+        var files = Directory.GetFiles(directoryPath)
+            .Select(Path.GetFileName) // Extract file names with extensions
+            .Select(name =>
+            {
+                // Remove the extension
+                var nameWithoutExtension = Path.GetFileNameWithoutExtension(name);
+                // Split by underscore and take the first part
+                var parts = nameWithoutExtension.Split('_');
+                return parts.Length > 0 ? parts[0] : nameWithoutExtension;
+            })
+            .Distinct() // Optional: Remove duplicates if multiple files have the same prefix
+            .ToList();
+
+        // Return the list of extracted names as JSON
+        return Results.Ok(files);
+    }
+    catch (Exception ex)
+    {
+        // Handle any potential exceptions
+        return Results.Problem($"An error occurred: {ex.Message}");
     }
 });
 

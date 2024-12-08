@@ -1,44 +1,65 @@
 @page "/stockPredictor"
 @using System.Text.Json
 @using AspireApp1.Web.Models
+@using AspireApp1.Web
 @inject StockPredictionApiClient ApiClient
-
+@inject CompanyListApiClient CompanyClient
 
 <EditForm Model="@PredictionRequest" OnValidSubmit="HandleValidSubmit" FormName="StockPredictionForm">
     <DataAnnotationsValidator />
-    
-    <!-- Company Name -->
-    <div>
-        <label>
-            CompanyName:
-            <InputText @bind-Value="PredictionRequest!.CompanyName" />
-        </label>
-    </div>
 
-    <!-- Recent Stock Prices -->
-    <div>
-        <label>
-            Recent Stock Prices (Last 10 days):
-            @for (int i = 0; i < 10; i++)
+    <!-- Company Name -->
+    <div class="mb-3">
+        <label class="form-label">
+            Company Name:
+            @if (_isLoading)
             {
-                int index = i;
-                <div>
-                    <InputNumber TValue="decimal" @bind-Value="PredictionRequest!.RecentStockPrices[index]" />
-                </div>
+                <p>Loading companies...</p>
+            }
+            else if (!string.IsNullOrEmpty(_loadingError))
+            {
+                <p class="text-danger">@_loadingError</p>
+            }
+            else
+            {
+                <InputSelect @bind-Value="PredictionRequest.CompanyName" class="form-control" required>
+                    <option value="">-- Select Company --</option>
+                    @foreach (var company in _companyNames)
+                    {
+                        <option value="@company">@company</option>
+                    }
+                </InputSelect>
             }
         </label>
     </div>
 
-    <!-- Related Company Prices -->
-    <label>
-        Related Company Prices (Previous Day):
-        @foreach (var company in _relatedCompanies)
+    <!-- Recent Stock Prices -->
+    <div class="mb-3">
+        <label class="form-label">
+            Recent Stock Prices (Last 10 days):
+        </label>
+        @for (int i = 0; i < 10; i++)
         {
-            <div>@company:
-            <InputNumber TValue="decimal" @bind-Value="PredictionRequest!.RelatedCompanyPrices[company]"/>
+            int index = i;
+            <div>
+                <InputNumber TValue="decimal" @bind-Value="PredictionRequest!.RecentStockPrices[index]" />
             </div>
         }
-    </label>
+    </div>
+
+    <!-- Related Company Prices -->
+    <div class="mb-3">
+        <label class="form-label">
+            Related Company Prices (Previous Day):
+        </label>
+        @foreach (var company in _relatedCompanies)
+        {
+            <div class="mb-2">
+                <label>@company:</label>
+                <InputNumber TValue="decimal" @bind-Value="PredictionRequest!.RelatedCompanyPrices[company]" class="form-control" />
+            </div>
+        }
+    </div>
 
     <!-- Economic Indicators 
     <div>
@@ -51,37 +72,41 @@
                     <label>@indicator:</label>
                     @for (int j = 0; j < currentIndicator.Count; j++)
                     {
-                        int idx = j;
                         <InputNumber TValue="decimal"
-                                     Value="@currentIndicator[idx]"
-                                     ValueChanged="@((decimal val) => OnEconomicIndicatorChanged(val, indicator, idx))"
-                                     ValueExpression="@(() => currentIndicator[idx])" />
+                                     @bind-Value="PredictionRequest.EconomicIndicators[indicator][j]"
+                                     class="form-control" />
                     }
                 </div>
             }
         </label>
     </div> -->
-    
+
     <!-- Submit Button -->
-    <button type="submit">Predict</button>
+    <button type="submit" class="btn btn-primary">Predict</button>
 </EditForm>
 
 @if (PredictionResponse != null)
 {
-    <h4>Prediction Result:</h4>
-    <p>Predicted Stock Price: @PredictionResponse.PredictedPrice</p>
-    <p>@PredictionResponse.Message</p>
+    <div class="mt-4">
+        <h4>Prediction Result:</h4>
+        <p><strong>Predicted Stock Price:</strong> @PredictionResponse.PredictedPrice</p>
+        <p>@PredictionResponse.Message</p>
+    </div>
 }
 
 @code {
-    [SupplyParameterFromForm] 
+    [SupplyParameterFromForm]
     private StockPredictionRequest? PredictionRequest { get; set; }
     private StockPredictionResponse PredictionResponse { get; set; }
 
     private List<string> _relatedCompanies = new List<string> { "CompanyA", "CompanyB", "CompanyC", "CompanyD", "CompanyE" };
     private List<string> _economicIndicators = new List<string> { "GDPGrowthRate", "UnemploymentRate", "InflationRate", "InterestRate" };
-    
-    protected override void OnInitialized()
+
+    private List<string> _companyNames = new List<string>();
+    private bool _isLoading = true;
+    private string _loadingError = string.Empty;
+
+    protected override async Task OnInitializedAsync()
     {
         PredictionRequest ??= new StockPredictionRequest()
         {
@@ -95,30 +120,45 @@
         {
             PredictionRequest.RelatedCompanyPrices.TryAdd(company, 0m);
         }
+
+        try
+        {
+            var companies = await CompanyClient.GetCompanyListAsync();
+            _companyNames = companies.ToList();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching company list: {ex.Message}");
+            _loadingError = "Failed to load company names. Please try again later.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+
         Console.WriteLine("Initialized!\n\n");
-
-
     }
-    
+
     private async Task HandleValidSubmit()
     {
         PredictionRequest.EconomicIndicators = new Dictionary<string, List<decimal>>();
         foreach (var indicator in _economicIndicators)
         {
-            PredictionRequest.EconomicIndicators.Add(indicator, [0.1m, 0.1m]);
+            PredictionRequest.EconomicIndicators.Add(indicator, new List<decimal> { 0.1m, 0.1m });
         }
         Console.WriteLine("Handle Submit\n\n\n\n");
-        Console.WriteLine("Company name is" + PredictionRequest.CompanyName + "\n\n");
+        Console.WriteLine("Company name is " + PredictionRequest.CompanyName + "\n\n");
         try
         {
             PredictionResponse = await ApiClient.PredictStockPriceAsync(PredictionRequest);
         }
         catch (HttpRequestException ex)
         {
-            
+            Console.WriteLine($"Error predicting stock price: {ex.Message}");
+            // Optionally, set an error message to display in the UI
         }
     }
-    
+
     private Task OnEconomicIndicatorChanged(decimal newValue, string indicator, int idx)
     {
         PredictionRequest.EconomicIndicators[indicator][idx] = newValue;
