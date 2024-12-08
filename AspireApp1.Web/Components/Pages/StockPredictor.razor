@@ -1,0 +1,127 @@
+@page "/stockPredictor"
+@using System.Text.Json
+@using AspireApp1.Web.Models
+@inject StockPredictionApiClient ApiClient
+
+
+<EditForm Model="@PredictionRequest" OnValidSubmit="HandleValidSubmit" FormName="StockPredictionForm">
+    <DataAnnotationsValidator />
+    
+    <!-- Company Name -->
+    <div>
+        <label>
+            CompanyName:
+            <InputText @bind-Value="PredictionRequest!.CompanyName" />
+        </label>
+    </div>
+
+    <!-- Recent Stock Prices -->
+    <div>
+        <label>
+            Recent Stock Prices (Last 10 days):
+            @for (int i = 0; i < 10; i++)
+            {
+                int index = i;
+                <div>
+                    <InputNumber TValue="decimal" @bind-Value="PredictionRequest!.RecentStockPrices[index]" />
+                </div>
+            }
+        </label>
+    </div>
+
+    <!-- Related Company Prices -->
+    <label>
+        Related Company Prices (Previous Day):
+        @foreach (var company in _relatedCompanies)
+        {
+            <div>@company:
+            <InputNumber TValue="decimal" @bind-Value="PredictionRequest!.RelatedCompanyPrices[company]"/>
+            </div>
+        }
+    </label>
+
+    <!-- Economic Indicators 
+    <div>
+        <label>
+            Economic Indicators (Last 2 days):
+            @foreach (var indicator in _economicIndicators)
+            {
+                var currentIndicator = PredictionRequest.EconomicIndicators[indicator];
+                <div>
+                    <label>@indicator:</label>
+                    @for (int j = 0; j < currentIndicator.Count; j++)
+                    {
+                        int idx = j;
+                        <InputNumber TValue="decimal"
+                                     Value="@currentIndicator[idx]"
+                                     ValueChanged="@((decimal val) => OnEconomicIndicatorChanged(val, indicator, idx))"
+                                     ValueExpression="@(() => currentIndicator[idx])" />
+                    }
+                </div>
+            }
+        </label>
+    </div> -->
+    
+    <!-- Submit Button -->
+    <button type="submit">Predict</button>
+</EditForm>
+
+@if (PredictionResponse != null)
+{
+    <h4>Prediction Result:</h4>
+    <p>Predicted Stock Price: @PredictionResponse.PredictedPrice</p>
+    <p>@PredictionResponse.Message</p>
+}
+
+@code {
+    [SupplyParameterFromForm] 
+    private StockPredictionRequest? PredictionRequest { get; set; }
+    private StockPredictionResponse PredictionResponse { get; set; }
+
+    private List<string> _relatedCompanies = new List<string> { "CompanyA", "CompanyB", "CompanyC", "CompanyD", "CompanyE" };
+    private List<string> _economicIndicators = new List<string> { "GDPGrowthRate", "UnemploymentRate", "InflationRate", "InterestRate" };
+    
+    protected override void OnInitialized()
+    {
+        PredictionRequest ??= new StockPredictionRequest()
+        {
+            CompanyName = string.Empty,
+            RecentStockPrices = [..new decimal[10]],
+            RelatedCompanyPrices = new Dictionary<string, decimal>(),
+            EconomicIndicators = new Dictionary<string, List<decimal>>()
+        };
+
+        foreach (var company in _relatedCompanies)
+        {
+            PredictionRequest.RelatedCompanyPrices.TryAdd(company, 0m);
+        }
+        Console.WriteLine("Initialized!\n\n");
+
+
+    }
+    
+    private async Task HandleValidSubmit()
+    {
+        PredictionRequest.EconomicIndicators = new Dictionary<string, List<decimal>>();
+        foreach (var indicator in _economicIndicators)
+        {
+            PredictionRequest.EconomicIndicators.Add(indicator, [0.1m, 0.1m]);
+        }
+        Console.WriteLine("Handle Submit\n\n\n\n");
+        Console.WriteLine("Company name is" + PredictionRequest.CompanyName + "\n\n");
+        try
+        {
+            PredictionResponse = await ApiClient.PredictStockPriceAsync(PredictionRequest);
+        }
+        catch (HttpRequestException ex)
+        {
+            
+        }
+    }
+    
+    private Task OnEconomicIndicatorChanged(decimal newValue, string indicator, int idx)
+    {
+        PredictionRequest.EconomicIndicators[indicator][idx] = newValue;
+        return Task.CompletedTask;
+    }
+}

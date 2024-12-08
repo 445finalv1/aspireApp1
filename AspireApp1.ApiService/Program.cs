@@ -27,7 +27,7 @@ app.MapPost("/stockprediction", (StockPredictionRequest request) =>
     {
         return Results.BadRequest("Invalid data.");
     }
-
+    Console.WriteLine("We made it!\n\n\n\n");
     // Load the ONNX model for the specified company
     var modelPath = Path.Combine("Data", "Models", $"{request.CompanyName}_model.onnx");
     if (!System.IO.File.Exists(modelPath))
@@ -46,22 +46,24 @@ app.MapPost("/stockprediction", (StockPredictionRequest request) =>
         var inputData = PrepareInputData(request, inputName);
 
         // Run inference
-        using var results = session.Run(inputData);
+        //using var results = session.Run(inputData);
 
         // Extract the prediction
-        var predictedPrice = results.First().AsEnumerable<float>().First();
+        //var predictedPrice = results.First().AsEnumerable<float>().First();
 
         // Return the response
         var response = new StockPredictionResponse
         {
-            PredictedPrice = (decimal)predictedPrice,
+            //PredictedPrice = (decimal)predictedPrice,
+            PredictedPrice = 324.5m,
             Message = "Prediction successful."
         };
-
+        //Console.WriteLine($"\nPredicted Price: {predictedPrice}");
         return Results.Ok(response);
     }
     catch (Exception ex)
     {
+        Console.WriteLine("Bad juju: " + ex.Message + "\n\n\n");
         // Handle exceptions
         return Results.Problem($"Internal server error: {ex.Message}");
     }

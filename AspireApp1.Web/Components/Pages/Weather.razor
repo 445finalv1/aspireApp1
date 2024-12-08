@@ -1,49 +1,118 @@
-﻿@page "/weather"
-@attribute [StreamRendering(true)]
-@attribute [OutputCache(Duration = 5)]
+﻿@page "/stockPrediction"
+@using AspireApp1.Web.Models
+@inject StockPredictionApiClient ApiClient
 
-@inject WeatherApiClient WeatherApi
+<h3>Stock Price Prediction</h3>
 
-<PageTitle>Weather</PageTitle>
+<EditForm Model="@predictionRequest" OnValidSubmit="HandleValidSubmit" FormName="StockPredictionForm">
+    <DataAnnotationsValidator />
 
-<h1>Weather</h1>
+    <!-- Company Name -->
+    <div>
+        <label>Company Name:</label>
+        <InputText @bind-Value="predictionRequest.CompanyName" />
+    </div>
 
-<p>This component demonstrates showing data loaded from a backend API service.</p>
+    <!-- Recent Stock Prices -->
+    <div>
+        <label>Recent Stock Prices (Last 10 Days):</label>
+        @for (int i = 0; i < 10; i++)
+        {
+            int index = i; // Capture the index in a local variable
+            <div>
+                <InputNumber Value="@predictionRequest.RecentStockPrices[index]"
+                             ValueChanged="@((decimal value) => predictionRequest.RecentStockPrices[index] = value)"
+                             ValueExpression="@(() => predictionRequest.RecentStockPrices[index])" />
+            </div>
+        }
+    </div>
 
-@if (forecasts == null)
+    <!-- Related Company Prices -->
+    <div>
+        <label>Related Company Prices (Previous Day):</label>
+        @foreach (var company in relatedCompanies)
+        {
+            <div>
+                <label>@company:</label>
+                <InputNumber Value="@predictionRequest.RelatedCompanyPrices[company]"
+                             ValueChanged="@((decimal value) => predictionRequest.RelatedCompanyPrices[company] = value)"
+                             ValueExpression="@(() => predictionRequest.RelatedCompanyPrices[company])" />
+            </div>
+        }
+    </div>
+
+    <!-- Economic Indicators -->
+    <div>
+        <label>Economic Indicators (Last 2 Days):</label>
+        @foreach (var indicator in economicIndicators)
+        {
+            var currentIndicatorValues = predictionRequest.EconomicIndicators[indicator];
+            <div>
+                <label>@indicator:</label>
+                @for (int j = 0; j < currentIndicatorValues.Count; j++)
+                {
+                    int idx = j; // Capture the index in a local variable
+                    <InputNumber @bind-Value="currentIndicatorValues[idx]" />
+                }
+            </div>
+        }
+    </div>
+
+    <!-- Submit Button -->
+    <button type="submit">Predict</button>
+</EditForm>
+
+@if (predictionResponse != null)
 {
-    <p><em>Loading...</em></p>
-}
-else
-{
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Date</th>
-                <th>Temp. (C)</th>
-                <th>Temp. (F)</th>
-                <th>Summary</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var forecast in forecasts)
-            {
-                <tr>
-                    <td>@forecast.Date.ToShortDateString()</td>
-                    <td>@forecast.TemperatureC</td>
-                    <td>@forecast.TemperatureF</td>
-                    <td>@forecast.Summary</td>
-                </tr>
-            }
-        </tbody>
-    </table>
+    <h4>Prediction Result:</h4>
+    <p>Predicted Stock Price: @predictionResponse.PredictedPrice</p>
+    <p>@predictionResponse.Message</p>
 }
 
 @code {
-    private WeatherForecast[]? forecasts;
+    private StockPredictionRequest predictionRequest;
+    private StockPredictionResponse predictionResponse;
 
-    protected override async Task OnInitializedAsync()
+    // Predefined lists
+    private List<string> relatedCompanies = new List<string> { "CompanyA", "CompanyB", "CompanyC", "CompanyD", "CompanyE" };
+    private List<string> economicIndicators = new List<string> { "GDPGrowthRate", "UnemploymentRate", "InflationRate", "InterestRate" };
+
+    protected override void OnInitialized()
     {
-        forecasts = await WeatherApi.GetWeatherAsync();
+        predictionRequest = new StockPredictionRequest
+        {
+            CompanyName = string.Empty,
+            RecentStockPrices = new List<decimal>(new decimal[10]),
+            RelatedCompanyPrices = new Dictionary<string, decimal>(),
+            EconomicIndicators = new Dictionary<string, List<decimal>>()
+        };
+
+        // Initialize RelatedCompanyPrices
+        foreach (var company in relatedCompanies)
+        {
+            predictionRequest.RelatedCompanyPrices.Add(company, 0m);
+        }
+
+        // Initialize EconomicIndicators
+        foreach (var indicator in economicIndicators)
+        {
+            predictionRequest.EconomicIndicators.Add(indicator, new List<decimal> { 0m, 0m });
+        }
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        try
+        {
+            // Use the injected ApiClient to get the prediction
+            predictionResponse = await ApiClient.PredictStockPriceAsync(predictionRequest);
+        }
+        catch (HttpRequestException ex)
+        {
+            predictionResponse = new StockPredictionResponse
+            {
+                Message = $"Error occurred while predicting stock price: {ex.Message}"
+            };
+        }
     }
 }
