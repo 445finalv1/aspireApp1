@@ -16,7 +16,7 @@ python AspireApp1.ApiService/trainingModels/testMain.py
 This will run for about twenty minutes, or shorter or longer depending on your computer. This will train all the models. The downloaded repository however will also have trained models in there.
 Once the models are trained, move them into "AspireApp1.ApiService/Data/Models".
 
-From there, you will need to install the .NET framework and .NET Aspire. links for installing for (Visual Studio and VS Code)[https://learn.microsoft.com/en-us/dotnet/aspire/fundamentals/setup-tooling?tabs=linux&pivots=visual-studio] and (JetBrains Rider)[https://blog.jetbrains.com/dotnet/2024/02/19/jetbrains-rider-and-the-net-aspire-plugin/] are listed here.
+From there, you will need to install the .NET framework and .NET Aspire. links for installing for [Visual Studio and VS Code](https://learn.microsoft.com/en-us/dotnet/aspire/fundamentals/setup-tooling?tabs=linux&pivots=visual-studio) and [JetBrains Rider](https://blog.jetbrains.com/dotnet/2024/02/19/jetbrains-rider-and-the-net-aspire-plugin/) are listed here.
 
 ## Running the Application
 
